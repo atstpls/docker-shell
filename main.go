@@ -1,7 +1,7 @@
 package main
 
 import (
-	"os"
+	"log"
 	"bytes"
 	"encoding/json"
 	"encoding/base64"
@@ -22,24 +22,16 @@ import (
 var port = flag.String("port", "8888", "Port for server")
 var host = flag.String("host", "127.0.0.1:2735", "Docker host")
 
-var contextPath = "/"
-
 func main() {
 	flag.Parse()
 
-	if cp := os.Getenv("CONTEXT_PATH"); cp != "" {
-		contextPath = strings.TrimRight(cp, "/")
-	}
-
-	http.Handle(contextPath + "/exec/", websocket.Handler(ExecContainer))
-        http.Handle(contextPath + "/", http.StripPrefix(contextPath + "/", http.FileServer(http.Dir("./"))))
-	if err := http.ListenAndServe(":"+*port, nil); err != nil {
-		panic(err)
-	}
+	http.Handle("/exec/", websocket.Handler(ExecContainer))
+    http.Handle("/", http.FileServer(http.Dir("./"))
+	log.Fatal(http.ListenAndServe(":"+*port, nil))
 }
 
 func ExecContainer(ws *websocket.Conn) {
-	wsParams := strings.Split(ws.Request().URL.Path[len(contextPath + "/exec/"):], ",")
+	wsParams := strings.Split(ws.Request().URL.Path[len("/exec/"):], ",")
 	container := wsParams[0]	
 	cmd, _ := base64.StdEncoding.DecodeString(wsParams[1])
 		
@@ -53,6 +45,9 @@ func ExecContainer(ws *websocket.Conn) {
 	var s stuff
 	params := bytes.NewBufferString("{\"AttachStdin\":true,\"AttachStdout\":true,\"AttachStderr\":true,\"Tty\":true,\"Cmd\":[\"" + string(cmd) + "\"]}")
 	resp, err := http.Post("http://" + *host + "/containers/" + container + "/exec", "application/json", params)
+	
+	fmt.Println("Status code: ", resp.StatusCode)
+
 	if err != nil {
 		panic(err)
 	}
